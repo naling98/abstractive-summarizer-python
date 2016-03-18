@@ -1,3 +1,4 @@
+import os
 from gurobipy import *
 import numpy as np
 from model_loader import load_model
@@ -23,7 +24,14 @@ PRONOUNS = ["it", "i", "you", "he", "they", "we", "she", "who", "them", "me", "h
 #            "D30046T","D30022T","D31050T","D30034T","D30042T","D30010T","D31022T","D30050T",
 #            "D31026T","D31038T"]
 
-doc_ids = ["D30024T"]
+doc_ids = ["D30006T"]
+
+if len(sys.argv) > 2:
+    parent_directory = sys.argv[1] #this directory contains all folders of document sets
+    doc_ids = os.listdir(parent_directory)
+else:
+    parent_directory = "/Users/chientran/Documents/jaist/abstractive_summarization/preprocessed_data/duc_2004"
+
 def PrintException():
     exc_type, exc_obj, tb = sys.exc_info()
     f = tb.tb_frame
@@ -36,7 +44,7 @@ def PrintException():
 for doc_id in doc_ids:
     print "processing %s" % doc_id
     noun_phrases, verb_phrases, corefs, docs, indicator_matrix = \
-        load_model("/Users/chientran/Documents/jaist/abstractive_summarization/preprocessed_data/duc_2004/%s" % doc_id)
+        load_model("%s/%s" % (parent_directory, doc_id))
 
     def gamma_key(noun_id, verb_id):
         return "gamma_%d:%d" % (noun_id, verb_id)
@@ -48,15 +56,17 @@ for doc_id in doc_ids:
             return "verb_%d:%d" % (phrase_1_id, phrase_2_id)
 
     def score(phrases, docs):
-        sum = 0.0
+        scores = []
         scorer = Scorer(docs)
 
         for id, phrase in phrases.items():
             p_score = scorer.calculate_score(phrase)
             phrase.score = p_score
-            sum += p_score
+            scores.append(p_score)
 
-        return sum
+        scores.sort()
+
+        return scores[len(scores)/2]
 
     def calculate_similarity(phrase_1, phrase_2):
         union_count = 0
@@ -250,12 +260,12 @@ for doc_id in doc_ids:
 
     def add_low_score_avoidance_constraint(model):
         for np_id, phrase in noun_phrases.items():
-            if phrase.score < mean_noun_score:
+            if phrase.score < mean_noun_score*0.3:
                 var = noun_vars[np_id]
                 model.addConstr(var == 0, "low_score_np_%d" % np_id)
 
         for vp_id, phrase in verb_phrases.items():
-            if phrase.score < mean_verb_score:
+            if phrase.score < mean_verb_score*0.3:
                 var = verb_vars[vp_id]
                 model.addConstr(var == 0, "low_score_vp_%d" % np_id)
 
@@ -263,8 +273,8 @@ for doc_id in doc_ids:
     total_noun_score = score(noun_phrases, docs)
     total_verb_score = score(verb_phrases, docs)
 
-    mean_noun_score = total_noun_score / len(noun_phrases.keys())
-    mean_verb_score = total_verb_score / len(verb_phrases.keys())
+    mean_noun_score = total_noun_score #/ len(noun_phrases.keys())
+    mean_verb_score = total_verb_score #/ len(verb_phrases.keys())
 
     compatibility_matrix, alternative_np, alternative_vp = build_compatibility_matrix(noun_phrases, verb_phrases, indicator_matrix, corefs)
 
@@ -353,6 +363,8 @@ for doc_id in doc_ids:
         keys_ordered = sentences_in_ordered.keys()
         keys_ordered.sort()
 
+        print keys_ordered
+
         summary = []
 
         for id in keys_ordered:
@@ -362,6 +374,8 @@ for doc_id in doc_ids:
                 s.append(verb_phrases[v_id].content)
 
             summary.append(' '.join(s))
+
+        print '\n'.join(summary)
 
         with open("output/%s_system.txt" % doc_id, "w") as f:
             f.write('\n'.join(summary))
