@@ -26,7 +26,7 @@ PRONOUNS = ["it", "i", "you", "he", "they", "we", "she", "who", "them", "me", "h
 
 doc_ids = ["D30006T"]
 
-if len(sys.argv) > 2:
+if len(sys.argv) > 1:
     parent_directory = sys.argv[1] #this directory contains all folders of document sets
     doc_ids = os.listdir(parent_directory)
 else:
